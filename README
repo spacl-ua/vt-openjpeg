@@ -1,0 +1,70 @@
+VT-OPENJPEG Package
+================================
+vt-openjpeg is an open-source implementation of visually-optimised JPEG 2000 encoding, which is derived from OpenJpeg.
+It also contains a matlab toolbox that measures visual threshold (VT) of each wavelet coefficients subbands.
+The VT-based JPEG 2000 encoder is described in Reference[1,4], and the VT measurement procedures are described in Reference[1,2,3].
+
+Installation
+---------------------------------
+There are two ways of downloading the latest version of the vt-openjpeg project
+* Download the zip file at https://github.com/yzlinaz/vt-openjpeg/archive/master.zip 
+* Git clone with a git client:
+	'git clone  https://github.com/yzlinaz/vt-openjpeg.git'
+The easiest way of building the project is to use the cmake & make system provided by the original Openjpeg project, i.e. at the current folder type
+	'cmake .'
+	'make' 
+Optionally, you can make a system-wide installation with
+	`sudo make install` 
+The compressor and decompressor are created at
+ `bin/opj_compress` (compressor)
+ `bin/opj_decompress` (decompressor)
+More build and installation options (e.g. Using third-party library for TIFF/PNG format) can be achieved by following the instruction provided in INSTALL
+
+Quick Manual
+---------------------------------
+The easiest way of invoking the encoder is by providing all the visual thresholds (VT) through a tab-delimited text file.
+For example, given the sample VT file at 'data/monitorA_VT1.txt', simply use the following command:
+	'opj_compress -i test.bmp -o test.jp2 -I -vt data/monitorA_VT1.txt'
+For more advanced usage please refer to the wiki page: https://github.com/yzlinaz/vt-openjpeg/wiki/Usage
+
+
+Details on folders hierarchy:
+---------------------------------
+* src(symobol "+" denotes the particular folder has been modified from the original OpenJpeg implementation to enable VT-optimized encoding)
+  * lib
+    * openjp2(+): contains the sources of the openjp2 library (Part 1 & 2), which contains modification for VT-optimized encoder.
+    * openjpwl: contains the additional sources if you want to build a JPWL-flavoured library.
+    * openjpip: complete client-server architecture for remote browsing of jpeg 2000 images.
+    * openjp3d: JP3D implementation
+    * openmj2: MJ2 implementation
+  * bin: contains all applications that use the openjpeg library
+    * common: common files to all applications
+    * jp2(+): a basic codec, which is able to encode/decode  VT-optimized codestream besides the original OpenJPEG codec's functionality
+    * mj2: motion jpeg 2000 executables
+    * jpip: OpenJPIP applications (server and dec server)
+      * java: a Java client viewer for JPIP
+    * jp3d: JP3D applications
+      * tcltk: a test tool for JP3D
+    * wx
+      * OPJViewer: gui for displaying j2k files (based on wxWidget)
+* matlab(+): contains the matlab toolbox for VT measurement
+* vt_tests(+): contains shell script example that illustrates interface of the encoder. 
+* data(+): contains example VT measurement data. 
+* wrapping
+  * java: java jni to use openjpeg in a java program
+* thirdparty: thirdparty libraries used by some applications. These libraries will be built only if there are not found on the system. Note that libopenjpeg itself does not have any dependency.
+* doc: doxygen documentation setup file and man pages
+* tests: configuration files and utilities for the openjpeg test suite. All test images are located in 'http://openjpeg.googlecode.com/svn/data' folder.
+* cmake: cmake related files
+
+see LICENSE for license and copyright information.
+see INSTALL for installation procedures.
+see NEWS for user visible changes in successive releases.
+see CHANGES for per-revision changes.
+
+
+Reference:
+[1] H. Oh, A. Bilgin and M. W. Marcellin, "Visually Lossless Encoding for JPEG2000," in IEEE Transactions on Image Processing, vol. 22, no. 1, pp. 189-201, January, 2013.
+[2] A. B. Watson and D. G. Pelli, "QUEST: A Bayesian adaptive psychometirc method," Perception and psychophysics, vol. 33, no. 2, February, 1983.
+[3] "Psychtoolbox-3 software [online].", http://psychtoolbox.org/.
+[4] Feng Liu, Yuzhang Lin, Eze L. Ahanonu, Michael W. Marcellin, Amit Ashok, Elizabeth A. Krupinski and Ali Bilgin, "Visibility Thresholds for Visually Lossy JPEG2000," Proc. SPIE 9971, Applications of Digital Image Processing XXXIX, 99711P, September, 2016. 
