@@ -7,10 +7,10 @@ The VT-based JPEG2000 encoder is described in references \[1,4] and the steps to
 Installation
 ------------
 There are two ways to download the latest version of the vt-openjpeg project
-* (Option 1) Download the zip file at https://github.com/yzlinaz/vt-openjpeg/archive/master.zip
+* (Option 1) Download the zip file at https://github.com/spacl-ua/vt-openjpeg/archive/master.zip
 * or (option 2) Git clone with a git client:
   ```
-  git clone  https://github.com/yzlinaz/vt-openjpeg.git
+  git clone  https://github.com/spacl-ua/vt-openjpeg.git
   ```
 
 The easiest way of building the project is to use the cmake & make system provided by the original OpenJPEG project, i.e. at the current folder type:
@@ -44,7 +44,7 @@ opj_compress -i test.bmp -o test.jp2 -I -JND 1 -monitor ../data/asus-pa328q.txt
 ```    
 
 Since JND is dependent on display characteristics, the software allows specification of the monitor parameters. In the above example, the monitor parameters are provided in ../data/asus-pa328q.txt
-For more advanced usage please refer to the wiki page: https://github.com/yzlinaz/vt-openjpeg/wiki/Usage
+For more advanced usage please refer to the wiki page: https://github.com/spacl-ua/vt-openjpeg/wiki/Usage
 
 
 Details on folders hierarchy:
