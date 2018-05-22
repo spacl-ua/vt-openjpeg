@@ -1,0 +1,2 @@
+pitch(mm) 0.1845
+distance(mm) 600
