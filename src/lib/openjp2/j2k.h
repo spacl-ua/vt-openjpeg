@@ -170,6 +170,21 @@ typedef struct opj_stepsize {
 	OPJ_INT32 mant;
 } opj_stepsize_t;
 
+/*Monitor and Human visual system parameters*/
+typedef struct hvs_system_parameter{
+	/* pitch size (mm) */
+	OPJ_FLOAT64 pitch;
+	/* viewing distance (mm) */
+	OPJ_FLOAT64 distance; 
+	/* VT extrapolation method 
+ * 	1: use xx4s for 5s 
+ * 	-1: no heuristics
+ * 		*/
+	OPJ_INT32 extrap_method;		
+	/*JNDs */
+        OPJ_FLOAT64 jnds[100];	
+} hvs_sys_param_t; 
+
 /**
 Tile-component coding parameters
 */
@@ -178,6 +193,8 @@ typedef struct opj_tccp
     /*-----vt encoding parameter------*/
 
     OPJ_BOOL custom_stepsize;
+    OPJ_BOOL dynamic_stepsize;
+    hvs_sys_param_t hvs_param;
     /* real-value of step size (KAKADU range)*/
     float *stepsize_real;
     OPJ_UINT32 numstepsizes;

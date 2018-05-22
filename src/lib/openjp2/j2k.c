@@ -6436,6 +6436,7 @@ void opj_j2k_setup_encoder(     opj_j2k_t *p_j2k,
 
                             /* VT encoding parameter */
                             if (parameters->custom_stepsize){
+				
 
                                 /*Verify VT encoding parameters*/
 
@@ -6467,6 +6468,12 @@ void opj_j2k_setup_encoder(     opj_j2k_t *p_j2k,
                                 /*intercept*/
                                 tccp->lin_mod_intercept = parameters->lin_mod_intercept + i *  numsubbands_derived ;
                                 tccp->numintercepts = numsubbands_derived;
+				/* for dynamic threshold */
+				tccp->dynamic_stepsize=parameters->dynamic_stepsize;
+				tccp->hvs_param.pitch   =  parameters->pitch;
+				tccp->hvs_param.distance = parameters->distance;
+				tccp->hvs_param.extrap_method = parameters->extrap_method;
+				tccp->hvs_param.jnds[0] = parameters->jnds[0];
 
                             }
 
@@ -6513,8 +6520,23 @@ void opj_j2k_setup_encoder(     opj_j2k_t *p_j2k,
                                     /*intercept*/
                                     tccp->lin_mod_intercept = parameters->lin_mod_intercept + i * numsubbands_derived ;
                                     tccp->numintercepts = numsubbands_derived;
+				    /************************************/
+					/* for dynamic threshold */
+					tccp->dynamic_stepsize=parameters->dynamic_stepsize;
+					tccp->hvs_param.pitch   =  parameters->pitch;
+					tccp->hvs_param.distance = parameters->distance;
+					tccp->hvs_param.extrap_method = parameters->extrap_method;
+					tccp->hvs_param.jnds[0] = parameters->jnds[0];
 
                                 }
+				/*
+			    	int j;
+			    	fprintf(stderr,"stepsize\n");
+				for (j=0;j<48;j++){
+				    fprintf(stderr,"%lf,",tccp->stepsize_real[j]);
+				}
+				fprintf(stderr,"\n");
+				*/
                                 if (! l_comp->sgnd) {
                                         tccp->m_dc_level_shift = 1 << (l_comp->prec - 1);
                                 }

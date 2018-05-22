@@ -43,12 +43,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-/*----------------------------------------start of hmm.c------------------------------------------*/
-
-
-
-
-/*----------------------------------------end of hmm.c------------------------------------------*/
 
 
 
@@ -79,6 +73,10 @@
 #include "index.h"
 
 #include "format_defs.h"
+
+/*For VT calculation*/
+#include "covertfunctions.h"
+
 
 typedef struct dircnt{
     /** Buffer for holding images read from Directory*/
@@ -286,14 +284,14 @@ static void encode_help_display(void) {
     fprintf(stdout,"-threshold <VTs of color component 1>:<VTs of color component 2>:<VTs of color component 3>\n");
     fprintf(stdout,"    Thresholds for each subband, ordered in the following order:\n");
     fprintf(stdout,"        LL_D,LH_D,HL_D,HH_D,.....LH_1,HL_1,HH_1,where D is the decomposition level\n");
-    fprintf(stdout,"    The thresholds must have a normlized range of [0,0.5]\n");
+    fprintf(stdout,"    The thresholds must have a normalized range of [0,0.5]\n");
     fprintf(stdout,"\n");
 
 
     fprintf(stdout,"-stepsize <stepsizes of color component 1>:<stepsizes of color component 2>:<stepsizes of color component 3>\n");
-    fprintf(stdout,"    baselie quantization stepsize for each subband, ordered in the following order:\n");
+    fprintf(stdout,"    baseline quantization stepsize for each subband, ordered in the following order:\n");
     fprintf(stdout,"        LL_D,LH_D,HL_D,HH_D,.....LH_1,HL_1,HH_1,where D is the decomposition level\n");
-    fprintf(stdout,"    The quantization stpsize must have a normlized range of [0,0.5]\n");
+    fprintf(stdout,"    The quantization stepsize must have a normalized range of [0,0.5]\n");
     fprintf(stdout,"\n");
 
 
@@ -537,11 +535,17 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
         {"stepsize",REQ_ARG,NULL,'Q'},
         {"lin_model_slope",REQ_ARG,NULL,'A'},
         {"threshold",REQ_ARG,NULL,'B'},
-        {"vt",REQ_ARG,NULL,'V'}
+        {"vt",REQ_ARG,NULL,'V'},
+	{"monitor",REQ_ARG,NULL,'U'},
+	{"JND",REQ_ARG,NULL,'j'},
+	{"extrap",REQ_ARG,NULL,'D'},/*For development*/
+	{"perceptual_rate_alloc",REQ_ARG,NULL,'G'},/*For release*/
+	{"lum_chrom_balance",REQ_ARG,NULL,'H'},/*For release*/
+	{"dynamic_stepsize",REQ_ARG,NULL,'e'}
     };
 
     /* parse the command line */
-    const char optlist[] = "i:o:r:q:n:b:c:t:p:s:SEM:x:R:d:T:If:P:C:F:u:JY:Q:A:B:D:V"
+    const char optlist[] = "i:o:r:q:n:b:c:t:p:s:SEM:x:R:d:T:If:P:C:F:u:JY:Q:A:B:D:V:U:j:D:G:H:e"
         #ifdef USE_JPWL
             "W:"
         #endif /* USE_JPWL */
@@ -553,7 +557,16 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
     /*for vt-parameters*/
     int num_vt_entry=0; /* number of rows in the vt measuremnet text file*/
+    double jnd_levels[100];
+    double pitch=-1.0;
+    double distance=-1.0;
 
+    /* more parameters for VT adjustment */
+    int extrap_method=-1; /*Extroplotion method: -1(default) no additional requirement. 1:use xx4 to replace xx5 */
+    int dynamic_stepsize=-1;
+    int flag_after_mask=-1; /*wether to apply prob. sum. model after or before masking: 0- before; 1-after*/    
+    int flag_jnd_cap=-1; /*whether or not to constrain the subband JDN to be at least JND ONE: 0-no, 1-yes*/
+    int lum_chrom_gain=-1;
 
 
     do{
@@ -561,6 +574,132 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
         if (c == -1)
             break;
         switch (c) {
+
+	case 'e':/*Stepsizes are calculated on the fly for EACH codeblock using statistics from the codeblocks*/
+	{
+		char *s = opj_optarg;
+		if (sscanf(s,"%d",&dynamic_stepsize)!=1){
+			fprintf(stderr,"-dynamic_stepsize options not properly provided\n");
+		}
+		else
+			fprintf(stderr,"stepsize calculation method = %d......\n",dynamic_stepsize);
+		
+	}	
+	break;
+
+	case 'G': /*perceptual_rate_alloc*/
+	{
+
+		extrap_method=2;
+		char *s = opj_optarg;
+		if (sscanf(s,"%d",&extrap_method)!=1 || extrap_method != 2) {
+			fprintf(stderr,"-extrap options not properly provided! Set to default %d\n",extrap_method); 
+			extrap_method = 2;
+		}	
+		else 
+			fprintf(stderr,"extrapolation method = %d......\n",extrap_method);
+		
+	}
+	break;
+
+	case 'H': /*lum_chrom_balance*/
+	{
+		lum_chrom_gain=3;
+		char *s = opj_optarg;
+		if (sscanf(s,"%d",&lum_chrom_gain)!=1)
+			fprintf(stderr,"-extrap options not properly provided! Set to default %d\n",lum_chrom_gain);
+		else 
+			fprintf(stderr,"luminance/chrominance gain = %d......\n",lum_chrom_gain);
+		
+	}
+	break;
+	
+	case 'D': /*JND extrapolation method*/
+	{
+		char *s = opj_optarg;
+		if (sscanf(s,"%dx%dx%dx%d",&extrap_method,&flag_after_mask,&flag_jnd_cap,&lum_chrom_gain)!=4){
+		if (sscanf(s,"%d",&extrap_method)!=1)
+			/* "new" compound cmd options */
+				fprintf(stderr,"-extrap options not properly provided\n");
+			else 
+				fprintf(stderr,"extrapolation method = %d......\n",extrap_method);
+
+		}
+		else{
+			fprintf(stderr," NEW extrapolation method = %dx%dx%dx%d......\n",extrap_method,flag_after_mask,flag_jnd_cap,lum_chrom_gain);
+		
+		}
+	}
+	break;	
+	
+	case 'j':/*JND level*/
+	{
+		int cnt_s=0;
+		char *s = opj_optarg;
+		
+		while (sscanf(s,"%lf",&(jnd_levels[cnt_s]))==1){
+			cnt_s++;
+			while ( *s && ( *s != ':' ) )    {
+			    s++;
+			}
+		}
+		parameters->tcp_numlayers = cnt_s;
+	        fprintf(stderr,"%d JND levels will be coded\n",cnt_s);
+
+		/*Default adjustment parameters*/	
+		extrap_method=2; /*Extroplotion method: -1(default) no additional requirement. 1:use xx4 to replace xx5 */
+		dynamic_stepsize=(dynamic_stepsize ==-1) ? 0:dynamic_stepsize;
+		flag_after_mask=0; /*wether to apply prob. sum. model after or before masking: 0- before; 1-after*/    
+		flag_jnd_cap=0; /*whether or not to constrain the subband JDN to be at least JND ONE: 0-no, 1-yes*/
+		lum_chrom_gain= ( lum_chrom_gain ==-1 ) ? 3 : lum_chrom_gain;
+
+	}	
+	break;
+
+	case 'U': /*VTs are calculated from single-DWT-coefficient stimuli*/
+	{
+            char *infile = opj_optarg;
+            FILE* IN = fopen(infile, "r");
+            if (!IN)
+            {
+                fprintf(stderr, "Failed to open VT parameter file %s for reading !!\n", infile);
+                return 1;
+            }
+            /* Monitor parameter names*/
+            const char str_pitch[20]= "pitch(mm)";
+            const char str_distance[20] = "distance(mm)";
+            char str_line [100];
+            char str_filed [100];
+            const char delim[3]=" \t" ;
+            char* token;
+            /*parse first line*/
+            while (fgets(str_line,99,IN) != NULL){
+		    token = strtok(str_line,"\n"); /* remove newline*/
+		    //fprintf(stderr,"token=%s\n",token);
+		    token = strtok(token,delim);
+		    //fprintf(stderr,"token=%s.\n",token);
+		    while (token != NULL){
+			if (strcmp(token,str_pitch)==0){
+				token = strtok(NULL,delim);
+		//		fprintf(stderr,"token=%s.\n",token);
+				if (sscanf(token,"%lf",&pitch) !=1)
+					fprintf(stderr,"Failed to read pitch size\n");
+				break;
+			}
+			if (strcmp(token,str_distance)==0){
+				token = strtok(NULL,delim);
+		//		fprintf(stderr,"token=%s.\n",token);
+				sscanf(token,"%lf",&distance);
+				break;
+			}
+			fprintf(stderr,"ERROR encountered while parsing -monitor option: %s optinon not recogonized\n",token);
+			return 1;
+		    }
+	    }
+	
+	   fprintf(stderr,"monitor parameters read:\n\tpitch    = %f mm\n\tdistance = %f mm\n",pitch,distance);
+	}
+	break;
 
         case 'V': /*Text file containing VT,slopes,stepsize...*/
         {
@@ -769,7 +908,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
                 s++;
             }
             parameters->tcp_numlayers = cnt_s/num_subbands;
-        //    fprintf(stderr,"number of layers=%d\n",parameters->tcp_numlayers);
+        //    fprintf(stderr,"number of layers= %d\n",parameters->tcp_numlayers);
             parameters->numslopes= cnt_s;
             fprintf(stderr, " [VT encoding] %d slopes provided\n ",parameters->numslopes);
            }
@@ -1246,7 +1385,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
         case 'R':			/* ROI */
         {
-            if (sscanf(opj_optarg, "c=%d,U=%d", &parameters->roi_compno,
+            if (sscanf(opj_optarg, "c= %d,U= %d", &parameters->roi_compno,
                        &parameters->roi_shift) != 2) {
                 fprintf(stderr, "ROI error !! [-ROI c='compno',U='shift']\n");
                 return 1;
@@ -1452,7 +1591,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     hprot = 1; /* predefined method */
 
-                    if(sscanf(token, "h=%d", &hprot) == 1) {
+                    if(sscanf(token, "h= %d", &hprot) == 1) {
                         /* Main header, specified */
                         if (!((hprot == 0) || (hprot == 1) || (hprot == 16) || (hprot == 32) ||
                               ((hprot >= 37) && (hprot <= 128)))) {
@@ -1461,7 +1600,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
                         }
                         parameters->jpwl_hprot_MH = hprot;
 
-                    } else if(sscanf(token, "h%d=%d", &tile, &hprot) == 2) {
+                    } else if(sscanf(token, "h%d= %d", &tile, &hprot) == 2) {
                         /* Tile part header, specified */
                         if (!((hprot == 0) || (hprot == 1) || (hprot == 16) || (hprot == 32) ||
                               ((hprot >= 37) && (hprot <= 128)))) {
@@ -1507,7 +1646,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     pprot = 1; /* predefined method */
 
-                    if (sscanf(token, "p=%d", &pprot) == 1) {
+                    if (sscanf(token, "p= %d", &pprot) == 1) {
                         /* Method for all tiles and all packets */
                         if (!((pprot == 0) || (pprot == 1) || (pprot == 16) || (pprot == 32) ||
                               ((pprot >= 37) && (pprot <= 128)))) {
@@ -1518,7 +1657,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
                         parameters->jpwl_pprot_packno[0] = 0;
                         parameters->jpwl_pprot[0] = pprot;
 
-                    } else if (sscanf(token, "p%d=%d", &tile, &pprot) == 2) {
+                    } else if (sscanf(token, "p%d= %d", &tile, &pprot) == 2) {
                         /* method specified from that tile on */
                         if (!((pprot == 0) || (pprot == 1) || (pprot == 16) || (pprot == 32) ||
                               ((pprot >= 37) && (pprot <= 128)))) {
@@ -1535,7 +1674,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
                             parameters->jpwl_pprot[packspec++] = pprot;
                         }
 
-                    } else if (sscanf(token, "p%d:%d=%d", &tile, &pack, &pprot) == 3) {
+                    } else if (sscanf(token, "p%d:%d= %d", &tile, &pack, &pprot) == 3) {
                         /* method fully specified from that tile and that packet on */
                         if (!((pprot == 0) || (pprot == 1) || (pprot == 16) || (pprot == 32) ||
                               ((pprot >= 37) && (pprot <= 128)))) {
@@ -1610,7 +1749,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     sens = 0; /* predefined: relative error */
 
-                    if(sscanf(token, "s=%d", &sens) == 1) {
+                    if(sscanf(token, "s= %d", &sens) == 1) {
                         /* Main header, specified */
                         if ((sens < -1) || (sens > 7)) {
                             fprintf(stderr, "ERROR -> invalid main header sensitivity method s = %d\n", sens);
@@ -1618,7 +1757,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
                         }
                         parameters->jpwl_sens_MH = sens;
 
-                    } else if(sscanf(token, "s%d=%d", &tile, &sens) == 2) {
+                    } else if(sscanf(token, "s%d= %d", &tile, &sens) == 2) {
                         /* Tile part header, specified */
                         if ((sens < -1) || (sens > 7)) {
                             fprintf(stderr, "ERROR -> invalid tile part header sensitivity method s = %d\n", sens);
@@ -1662,7 +1801,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     addr = 0; /* predefined: auto */
 
-                    if(sscanf(token, "a=%d", &addr) == 1) {
+                    if(sscanf(token, "a= %d", &addr) == 1) {
                         /* Specified */
                         if ((addr != 0) && (addr != 2) && (addr != 4)) {
                             fprintf(stderr, "ERROR -> invalid addressing size a = %d\n", addr);
@@ -1687,7 +1826,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     size = 1; /* predefined: 1 byte */
 
-                    if(sscanf(token, "z=%d", &size) == 1) {
+                    if(sscanf(token, "z= %d", &size) == 1) {
                         /* Specified */
                         if ((size != 0) && (size != 1) && (size != 2)) {
                             fprintf(stderr, "ERROR -> invalid sensitivity size z = %d\n", size);
@@ -1712,7 +1851,7 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
 
                     range = 0; /* predefined: 0 (packet) */
 
-                    if(sscanf(token, "g=%d", &range) == 1) {
+                    if(sscanf(token, "g= %d", &range) == 1) {
                         /* Specified */
                         if ((range < 0) || (range > 3)) {
                             fprintf(stderr, "ERROR -> invalid sensitivity range method g = %d\n", range);
@@ -1822,7 +1961,173 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
         }
     }
     /* yl*/
-    fprintf(stderr,"number of layers=%d\n",parameters->tcp_numlayers);
+    fprintf(stderr,"number of layers = %d\n",parameters->tcp_numlayers);
+
+    if (pitch>0.0 && distance>0.0)/*Monitor parameters are provided, from which VTs are dirived*/
+    {   
+	fprintf(stderr,"Calculating Perceptual Thresholds (VT)....\n");
+	int i,c;
+	double** vt_table= (double**)malloc(15* sizeof(double*));
+        for(i=0;i<15;i++)
+                vt_table[i]= (double*)malloc(3 * sizeof(double));
+
+	if (dynamic_stepsize==1){
+		parameters->dynamic_stepsize       = 1;	
+		parameters->extrap_method          = extrap_method;
+		parameters->pitch                  = pitch;
+		parameters->distance               = distance;
+		parameters->jnds[0]                = jnd_levels[0]; /*works only masking after flag_after_mask==0*/
+	}
+	
+	if (extrap_method!=2)
+		find_block_tb(pitch,distance,jnd_levels[0],vt_table); /* output vt_table's range:[0,128]*/
+	else{
+		if (dynamic_stepsize==1){
+			fprintf(stderr,"-dynamic_size=1 & extrap_method=2 .....\n");
+			//fprintf(stderr,"-dynamic_size=1 & extrap_method=2 not supported right now\n");
+			//return 1;
+		}
+		int orient;
+		double jnd_subband;
+		if (flag_after_mask=-1 && flag_jnd_cap==-1){/* prob.sum model V1*/
+		for (i=0; i<5; i++){
+			jnd_subband=jnd_levels[0]/pow(4.0,i);
+			if (jnd_subband<1.0)
+				jnd_subband=1.0;
+			
+			for (c=0;c<3;c++){
+				/*HH*/
+				find_block_tb_given_sig2(pitch,distance,jnd_subband,&vt_table[i*3][c],-1.0,c,i,3,0,500,1); /* output vt_table's range:[0,128]*/
+				/*HL*/
+				find_block_tb_given_sig2(pitch,distance,jnd_subband,&vt_table[i*3+1][c],-1.0,c,i,1,0,500,1); /* output vt_table's range:[0,128]*/
+				/*LL*/
+				find_block_tb_given_sig2(pitch,distance,jnd_subband,&vt_table[i*3+2][c],-1.0,c,i,0,0,500,1); /* output vt_table's range:[0,128]*/
+			}
+		}
+		} /*prob sum model v1*/
+		else{ /*prob sum v2*/
+
+		if (lum_chrom_gain > 0)
+			fprintf(stderr,"adjusting for chrom/lum masking (M=%d)\n", lum_chrom_gain);
+		
+		fprintf(stderr,"----------------VT table:------------\n");
+		fprintf(stderr,"x\tHH\tHL\tLL\n",c);
+		for (i=0; i<5; i++){
+			fprintf(stderr,"level %d:\n",i+1);
+
+			jnd_subband=jnd_levels[0]/pow(4.0,(double)(i+1));
+			if (jnd_subband<1.0 && flag_jnd_cap)
+				jnd_subband=1.0;
+			/*arguments for VT function*/
+			double jnd_tmp;
+			double jnd_dipper;
+			int vt_opt_tmp;			
+			vt_opt_tmp = (flag_jnd_cap==1)    ?(2): (3);	
+			if (flag_after_mask==1)
+				vt_opt_tmp = 0; 
+			
+
+			for (c=0;c<3;c++){
+				jnd_tmp    = (flag_after_mask==1) ?(jnd_subband):(jnd_levels[0]);
+				jnd_dipper    = (flag_after_mask==1) ?(1.0):(pow(4.0,(double)(i+1)));
+				
+				if (lum_chrom_gain>0 && c>0){
+					if (jnd_tmp > jnd_dipper*((double)lum_chrom_gain)){
+						jnd_tmp = jnd_tmp/((double)lum_chrom_gain);	
+					}
+					else{ /*in the dipper/plateu*/
+						if (jnd_tmp > jnd_dipper)
+							jnd_tmp = jnd_dipper;
+
+					}
+				}
+				int flag_mask =1;
+				// No masking for lum level 5//
+				if (c==0)
+					flag_mask=(i==4)? (0) : (1);
+				
+				/*HH*/
+				find_block_tb_given_sig2(pitch,distance,jnd_tmp,&vt_table[i*3][c],-1.0,c,i,3,vt_opt_tmp,500,flag_mask); /* output vt_table's range:[0,128]*/
+				fprintf(stderr,"Comp %d:\t%f\t",c,vt_table[i*3][c]);
+				/*HL*/
+				find_block_tb_given_sig2(pitch,distance,jnd_tmp,&vt_table[i*3+1][c],-1.0,c,i,1,vt_opt_tmp,500,flag_mask); /* output vt_table's range:[0,128]*/
+				fprintf(stderr,"%f\t",vt_table[i*3+1][c]);
+				/*LL*/
+				find_block_tb_given_sig2(pitch,distance,jnd_tmp,&vt_table[i*3+2][c],-1.0,c,i,0,vt_opt_tmp,500,flag_mask); /* output vt_table's range:[0,128]*/
+				fprintf(stderr,"%f\n",vt_table[i*3+2][c]);
+			}
+		}/*level*/
+
+		} /*prob sum model v2*/
+
+	}
+
+
+	for (c=0; c<3; c++){/*Color Component*/
+		for (i=0; i<15; i++){ /*Subband index*/
+			/*TODO: adjust for decomposition != 5*/					
+			int orient,level;
+			level  = i/3; /*0:level 1,1:level2....4:level5*/
+			orient = ((i - level*3) == 0)? (3) : (2-i+level*3);
+			switch (extrap_method) {
+				case -1:
+				{if (orient==0 && level !=4 )
+					continue;}
+				break;
+				case 1:
+					{
+						fprintf(stderr,"Use XX4 to replace XX5...\n");
+					}
+				break;
+				case 2:{
+					if (c==0 && i==0)
+					fprintf(stderr,"Probability summation pooling\n");
+				}
+				break;
+				default: 
+					fprintf(stderr,"something wrong\n");
+			}
+			switch (orient){
+				case 0: /*LL5*/
+					parameters->lin_mod_intercept[orient+c*16] = 
+						((extrap_method==1 && level==4)?(vt_table[i-3][c]):(vt_table[i][c])); /* range [0,128]*/
+				break;
+						
+				case 1: /*HLs/LHs*/
+					{parameters->lin_mod_intercept[(4-level)*3 +1 +c*16] = 
+						((extrap_method==1 && level==4)?(vt_table[i-3][c]):(vt_table[i][c])); /* range [0,128]*/
+					parameters->lin_mod_intercept[(4-level)*3 +2  +c*16] = 
+						((extrap_method==1 && level==4)?(vt_table[i-3][c]):(vt_table[i][c])); /* range [0,128]*/
+					}
+				break;
+				case 3: /*HHs*/
+					parameters->lin_mod_intercept[(4-level)*3 +3 + c*16] = 
+						((extrap_method==1 && level==4)?(vt_table[i-3][c]):(vt_table[i][c])); /* range [0,128]*/
+				break;
+				default: 
+					fprintf(stderr,"something wrong\n");
+				} /*orient*/ 
+		}/*Subband*/
+	}/*Color Component*/
+	/* Use custome stepsize*/
+            for (i=0; i< 48; i++){
+                parameters->stepsize[i] = parameters->lin_mod_intercept[i];
+			parameters->stepsize[i] = parameters->stepsize[i]/256.0; /* 0-128 --> 0--> 0.5*/
+		if (dynamic_stepsize==1)
+			parameters->stepsize[i] = parameters->stepsize[i]/2.0-0.00001; /* 0-128 --> 0--> 0.5*/
+
+
+            }
+	parameters->custom_stepsize = 1;
+        parameters->numstepsizes = 48;
+        parameters->cp_disto_alloc = 1;
+	parameters->numintercepts = 48;
+
+	for (i = 0; i<15; i++)
+                free(vt_table[i]);
+        free(vt_table);
+	} /*dynamic_stepsize==1?*/
+    else{/*VT's are direclty privided*/
 
     if (parameters->custom_stepsize){
         parameters->cp_disto_alloc = 1;
@@ -1854,9 +2159,8 @@ static int parse_cmdline_encoder(int argc, char **argv, opj_cparameters_t *param
             fprintf(stderr,"[ERROR] Bad command line options\n, missing threshold?");
             return 1;
         }
-
     }
-
+    }
     /* end yl*/
     return 0;
 }

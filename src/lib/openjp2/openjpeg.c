@@ -663,6 +663,7 @@ void OPJ_CALLCONV opj_set_default_encoder_parameters(opj_cparameters_t *paramete
 		parameters->numintercepts=0;
 		parameters->numslopes=0;
 		parameters->numstepsizes=0;
+		parameters->dynamic_stepsize=0;
 /* UniPG>> */
 #ifdef USE_JPWL
 		parameters->jpwl_epc_on = OPJ_FALSE;

@@ -120,7 +120,9 @@ static void yl_opj_t1_encode_cblk(opj_t1_t *t1,
                                   OPJ_FLOAT64 *lin_mod_slope,
                                   OPJ_FLOAT64 *lin_mod_intercept,
                                   OPJ_INT32 num_vts,
-                                  OPJ_INT32* tiledp
+                                  OPJ_INT32* tiledp,
+				  OPJ_BOOL dynamic_stepsize,
+				  hvs_sys_param_t* hvs_param
                                  );
 //visually lossless coding :end
 
@@ -2189,7 +2191,9 @@ OPJ_BOOL opj_t1_encode_cblks(   opj_t1_t *t1,
                                 tccp->lin_mod_slope,
                                 tccp->lin_mod_intercept,
                                 tccp->num_vts,
-                                tiledp);
+                                tiledp,
+				tccp->dynamic_stepsize,
+				&(tccp->hvs_param));
 
 //yl:end
                     } /* cblkno */
@@ -2219,7 +2223,9 @@ void yl_opj_t1_encode_cblk(opj_t1_t *t1,
                            OPJ_FLOAT64 *lin_mod_slope,
                            OPJ_FLOAT64 *lin_mod_intercept,
                            OPJ_INT32 num_vts,
-                           OPJ_INT32* tiledp)
+                           OPJ_INT32* tiledp,
+			   OPJ_BOOL dynamic_threshold,
+			   hvs_sys_param_t* hvs_param)
 {
 #ifdef IS_DEBUG_PRINTF
     fprintf(stderr,"[T1 encoding]:yl_opj_t1_encode_cblk(orient=%d,level=%d)\n",orient,level);
@@ -2323,17 +2329,29 @@ void yl_opj_t1_encode_cblk(opj_t1_t *t1,
         else     //Chrominance LH/HL/HH
             jnd_threshold[i_vt] = lin_mod_intercept[level*3 + orient-1+i_vt*48];
         */
+/*read threshold with default variance*/
         i_band = (orient == 0) ? 0: ( ( 4-level) * 3 +orient );
         if (compno==0 && level<5)
             jnd_threshold[i_vt] = lin_mod_slope[i_band+i_vt*16]*sample_var+lin_mod_intercept[i_band+i_vt*48];
         else  //Luminance/ Chrominance LL5 or chrominance
             jnd_threshold[i_vt] = lin_mod_intercept[i_band+i_vt*48];
 
+	double jnd_threshold_var_dep; //variance-dependent jnd-threshold
+	if (dynamic_threshold && level>=3 && compno==0){
+		int vt_opt_tmp =3; //flag_jnd_cap=0 && flag_after_mask=0
+		/*fprintf(stderr,"[invoke]find_block_tb_given_sig2(0.1845, 600, %lf, %lf, sample_var=%lf,compno=%d,level=%d, orient=%d\n", hvs_param->jnds[0], jnd_threshold[i_vt],sample_var,compno,((level==5) ? (4) : (level)),orient);	*/
+		if (hvs_param->extrap_method==1 && level>=3)
+			find_block_tb_given_sig2(0.1845, 600.0, hvs_param->jnds[0], &jnd_threshold_var_dep ,sample_var,((int)compno), 3 ,((OPJ_INT32)orient),500);	
+		else
+			find_block_tb_given_sig2(0.1845, 600.0, hvs_param->jnds[0], &jnd_threshold_var_dep ,sample_var,((int)compno), ((OPJ_INT32)((level==5) ? (4) : (level))),((OPJ_INT32)orient),vt_opt_tmp,500);	
 
+		fprintf(stderr,"[return]find_block_tb_given_sig2(0.1845, 600, %lf, %lf, sample_var=%lf,compno=%d,level=%d orient=%d\n Defaut variance givess %lf\n", hvs_param->jnds[0], jnd_threshold_var_dep,sample_var,compno,((level==5) ? (4) : (level)),orient,jnd_threshold[i_vt]);	
+	jnd_threshold[i_vt] = (jnd_threshold[i_vt] > jnd_threshold_var_dep)? jnd_threshold_var_dep : jnd_threshold[i_vt] ;
+			
+	}
 
         qthresh[i_vt]=jnd_threshold[i_vt]/stepsize;
-    }
-
+}
 #ifdef IS_DEBUG_PRINTF
     if (compno==0)
     {

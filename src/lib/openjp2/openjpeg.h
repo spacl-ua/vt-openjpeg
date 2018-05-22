@@ -352,6 +352,12 @@ typedef struct opj_cparameters {
     /*additional coding parameters for VT encoding */
     OPJ_BOOL vt_coding;  //visual-threshold coding
     OPJ_BOOL custom_stepsize;
+    OPJ_BOOL dynamic_stepsize;
+    /*for HVS*/
+    OPJ_FLOAT64 pitch;
+    OPJ_FLOAT64 distance; 
+    OPJ_INT32 extrap_method;
+    OPJ_FLOAT64 jnds[100];
     float stepsize[48];
     int numstepsizes;
     double lin_mod_slope[160]; //Assume <=10 VTs;FIXME: use malloc

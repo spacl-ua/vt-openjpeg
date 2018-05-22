@@ -1,3 +1,7 @@
+
+# source code for modeling HVS:
+add_subdirectory(hvs)
+
 # source code for openjpeg apps:
 add_subdirectory(common)
 # Part 1 & 2:

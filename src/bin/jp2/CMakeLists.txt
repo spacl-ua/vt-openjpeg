@@ -6,6 +6,7 @@ set(common_SRCS
   index.c
   ${OPENJPEG_SOURCE_DIR}/src/bin/common/color.c
   ${OPENJPEG_SOURCE_DIR}/src/bin/common/opj_getopt.c
+  ${OPENJPEG_SOURCE_DIR}/src/bin/hvs/covertfunctions.c
   )
 
 # Headers file are located here:
@@ -14,6 +15,7 @@ include_directories(
   ${OPENJPEG_BINARY_DIR}/src/bin/common # opj_apps_config.h
   ${OPENJPEG_SOURCE_DIR}/src/lib/openjp2
   ${OPENJPEG_SOURCE_DIR}/src/bin/common
+  ${OPENJPEG_SOURCE_DIR}/src/bin/hvs
   ${LCMS_INCLUDE_DIRNAME}
   ${Z_INCLUDE_DIRNAME}
   ${PNG_INCLUDE_DIRNAME}
